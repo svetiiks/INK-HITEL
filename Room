@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotel Room Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .info {
+      margin-bottom: 20px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+    }
+    .floor {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+      gap: 6px;
+    }
+    .room {
+      width: 25px;
+      height: 25px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 12px; /* немного уменьшено, чтобы цифры влезали */
+      color: white;
+      border: 2px solid #444;
+      border-radius: 3px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.1s;
+    }
+    .room:hover {
+      transform: scale(1.1);
+    }
+    .free {
+      background-color: #4CAF50;
+    }
+    .occupied {
+      background-color: #F44336;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="info">🟢 Green — free | 🔴 Red — occupied</div>
+
+  <!-- 10–19 -->
+  <div class="floor" id="floor10"></div>
+  <!-- 20–29 -->
+  <div class="floor" id="floor20"></div>
+  <!-- 30–39 -->
+  <div class="floor" id="floor30"></div>
+  <!-- 40–49 -->
+  <div class="floor" id="floor40"></div>
+  <!-- 50–59 -->
+  <div class="floor" id="floor50"></div>
+  <!-- 60, 61 -->
+  <div class="floor" id="floor60"></div>
+
+  <script>
+    // Все номера в правильном порядке
+    const floors = [
+      { id: 'floor10', rooms: Array.from({length: 10}, (_, i) => 10 + i) },
+      { id: 'floor20', rooms: Array.from({length: 10}, (_, i) => 20 + i) },
+      { id: 'floor30', rooms: Array.from({length: 10}, (_, i) => 30 + i) },
+      { id: 'floor40', rooms: Array.from({length: 10}, (_, i) => 40 + i) },
+      { id: 'floor50', rooms: Array.from({length: 10}, (_, i) => 50 + i) },
+      { id: 'floor60', rooms: [60, 61] }
+    ];
+
+    // Загрузка состояния из localStorage
+    function loadRoomStates() {
+      const saved = localStorage.getItem('hotelRoomStates');
+      return saved ? JSON.parse(saved) : {};
+    }
+
+    // Сохранение состояния в localStorage
+    function saveRoomStates(states) {
+      localStorage.setItem('hotelRoomStates', JSON.stringify(states));
+    }
+
+    // Создание комнат
+    function createRooms() {
+      const states = loadRoomStates();
+
+      floors.forEach(floor => {
+        const container = document.getElementById(floor.id);
+        container.innerHTML = ''; // очистить
+
+        floor.rooms.forEach(roomNum => {
+          const room = document.createElement('div');
+          room.className = 'room';
+          room.textContent = roomNum;
+          room.dataset.room = roomNum;
+
+          // Восстановить состояние
+          if (states[roomNum] === 'occupied') {
+            room.classList.add('occupied');
+          } else {
+            room.classList.add('free');
+          }
+
+          room.addEventListener('click', () => {
+            room.classList.toggle('free');
+            room.classList.toggle('occupied');
+
+            // Обновить состояние в объекте
+            const newStates = loadRoomStates();
+            newStates[roomNum] = room.classList.contains('occupied') ? 'occupied' : 'free';
+            saveRoomStates(newStates);
+          });
+
+          container.appendChild(room);
+        });
+      });
+    }
+
+    // Инициализация
+    createRooms();
+  </script>
+</body>
+</html>
