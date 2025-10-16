@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotel Worker Assignment</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+    h2 {
+      margin-top: 0;
+      color: #2c3e50;
+      text-align: center;
+    }
+    .date-display {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      margin-bottom: 15px;
+    }
+    input[type="text"] {
+      padding: 10px;
+      font-size: 16px;
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background: #ecf0f1;
+    }
+    .room-select {
+      width: 100%;
+      padding: 6px;
+      font-size: 14px;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #27ae60;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      display: block;
+      margin: 20px auto;
+    }
+    button:hover:not(:disabled) {
+      background: #219653;
+    }
+    button:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: white;
+      margin: 15% auto;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .modal-buttons {
+      margin-top: 20px;
+    }
+    .modal-buttons button {
+      display: inline-block;
+      width: 48%;
+      margin: 0 1%;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container" id="mainContainer">
+    Загрузка...
+  </div>
+
+  <!-- Modal for PDF confirmation -->
+  <div id="pdfModal" class="modal">
+    <div class="modal-content">
+      <h3>Save Report?</h3>
+      <p>Work completed. Save PDF report?</p>
+      <div class="modal-buttons">
+        <button id="pdfYes">Yes</button>
+        <button id="pdfNo">No</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (typeof window.jspdf === 'undefined') {
+      document.getElementById('mainContainer').innerHTML = `
+        <h2>Loading Error</h2>
+        <p>PDF library failed to load. Please open with internet.</p>
+        <button onclick="location.reload()">Retry</button>
+      `;
+    } else {
+      const { jsPDF } = window.jspdf;
+
+      const ALL_ROOMS = [
+        10,11,12,13,14,15,16,17,18,19,
+        20,21,22,23,24,25,26,27,28,29,
+        30,31,32,33,34,35,36,37,38,39,
+        40,41,42,43,44,45,46,47,48,49,
+        50,51,52,53,54,55,56,57,58,59,
+        60,61
+      ];
+
+      let selectedRooms = new Set();
+      let currentWorkerName = '';
+      let currentTasks = [];
+      const today = new Date().toLocaleDateString('en-GB');
+
+      function createRoomSelect(currentValue = '') {
+        const select = document.createElement('select');
+        select.className = 'room-select';
+        select.innerHTML = '<option value="">—</option>';
+        ALL_ROOMS.forEach(room => {
+          const opt = document.createElement('option');
+          opt.value = room;
+          opt.textContent = room;
+          if (selectedRooms.has(room) && String(room) !== currentValue) {
+            opt.disabled = true;
+          }
+          if (String(room) === currentValue) {
+            opt.selected = true;
+          }
+          select.appendChild(opt);
+        });
+        return select;
+      }
+
+      function updateRoomAvailability() {
+        selectedRooms.clear();
+        document.querySelectorAll('.room-select').forEach(sel => {
+          if (sel.value) selectedRooms.add(Number(sel.value));
+        });
+        document.querySelectorAll('.room-select').forEach(sel => {
+          const val = sel.value;
+          const newSel = createRoomSelect(val);
+          sel.replaceWith(newSel);
+          newSel.addEventListener('change', updateRoomAvailability);
+        });
+      }
+
+      function showInitialScreen() {
+        const container = document.getElementById('mainContainer');
+        container.innerHTML = `
+          <h2>Worker Assignment</h2>
+          <div class="date-display">Date: ${today}</div>
+          <input type="text" id="workerName" placeholder="Enter worker name" maxlength="30">
+          <h3>Assign Rooms</h3>
+          <table id="assignmentTable">
+            <thead>
+              <tr><th>Room</th><th>Checkout</th><th>Garim</th></tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+          <button id="startBtn">Start</button>
+        `;
+
+        const tbody = document.getElementById('tableBody');
+        for (let i = 0; i < 30; i++) {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td></td>
+            <td><input type="checkbox" class="checkout"></td>
+            <td><input type="checkbox" class="garim"></td>
+          `;
+          const select = createRoomSelect();
+          row.cells[0].appendChild(select);
+          tbody.appendChild(row);
+
+          const co = row.querySelector('.checkout');
+          const ga = row.querySelector('.garim');
+          co.addEventListener('change', () => { if (co.checked) ga.checked = false; });
+          ga.addEventListener('change', () => { if (ga.checked) co.checked = false; });
+          select.addEventListener('change', updateRoomAvailability);
+        }
+
+        document.getElementById('startBtn').addEventListener('click', validateAndStart);
+      }
+
+      function showResultScreen(filledRows) {
+        currentTasks = filledRows;
+        const container = document.getElementById('mainContainer');
+        let rowsHtml = '';
+        filledRows.forEach(item => {
+          rowsHtml += `
+            <tr>
+              <td>${item.room}</td>
+              <td>${item.checkout ? '✅' : ''}</td>
+              <td>${item.garim ? '✅' : ''}</td>
+              <td><input type="checkbox" class="done-check"></td>
+            </tr>
+          `;
+        });
+
+        container.innerHTML = `
+          <h2>Active Tasks for: ${currentWorkerName}</h2>
+          <div class="date-display">Date: ${today}</div>
+          <table>
+            <thead>
+              <tr><th>Room</th><th>Checkout</th><th>Garim</th><th>Done</th></tr>
+            </thead>
+            <tbody id="resultBody">
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <button id="finishBtn" class="hidden">Finish Work</button>
+        `;
+
+        function checkFinish() {
+          const allDone = Array.from(document.querySelectorAll('.done-check'))
+            .every(cb => cb.checked);
+          document.getElementById('finishBtn').classList.toggle('hidden', !allDone);
+        }
+
+        document.getElementById('resultBody').addEventListener('change', (e) => {
+          if (e.target.classList.contains('done-check')) {
+            checkFinish();
+          }
+        });
+
+        document.getElementById('finishBtn').addEventListener('click', () => {
+          document.getElementById('pdfModal').style.display = 'block';
+        });
+
+        checkFinish();
+      }
+
+      function generateAndDownloadPDF() {
+        const doc = new jsPDF();
+
+        let y = 20;
+        doc.setFontSize(18);
+        doc.text('Hotel Work Report', 14, y);
+        y += 12;
+
+        doc.setFontSize(12);
+        doc.text(`Worker: ${currentWorkerName}`, 14, y);
+        y += 8;
+        doc.text(`Date: ${today}`, 14, y);
+        y += 12;
+
+        doc.text('Completed Tasks (Status: Completed)', 14, y);
+        y += 8;
+
+        currentTasks.forEach(task => {
+          const action = task.checkout ? 'Checkout' : 'Garim';
+          const line = `Room ${task.room} — Task: ${action}`;
+          doc.text(line, 14, y);
+          y += 7;
+          if (y > 280) {
+            doc.addPage();
+            y = 20;
+          }
+        });
+
+        const filename = `hotel-report-${currentWorkerName.replace(/\s+/g, '-')}-${today.replace(/\//g, '-')}.pdf`;
+        doc.save(filename);
+        showInitialScreen();
+      }
+
+      function validateAndStart() {
+        const name = document.getElementById('workerName').value.trim();
+        if (!name) {
+          alert('Please enter worker name!');
+          return;
+        }
+
+        const filledRows = [];
+        document.querySelectorAll('#tableBody tr').forEach(row => {
+          const room = row.querySelector('.room-select').value;
+          const co = row.querySelector('.checkout').checked;
+          const ga = row.querySelector('.garim').checked;
+          if (room && (co || ga)) {
+            filledRows.push({ room, checkout: co, garim: ga });
+          }
+        });
+
+        if (filledRows.length === 0) {
+          alert('Please assign at least one room with a task!');
+          return;
+        }
+
+        currentWorkerName = name;
+        showResultScreen(filledRows);
+      }
+
+      document.getElementById('pdfYes').addEventListener('click', () => {
+        document.getElementById('pdfModal').style.display = 'none';
+        generateAndDownloadPDF();
+      });
+
+      document.getElementById('pdfNo').addEventListener('click', () => {
+        document.getElementById('pdfModal').style.display = 'none';
+        showInitialScreen();
+      });
+
+      showInitialScreen();
+    }
+  </script>
+</body>
+</html>
