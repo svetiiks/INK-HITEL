@@ -207,273 +207,271 @@
   </div>
 
   <script>
-    // === ГЛОБАЛЬНЫЕ НАСТРОЙКИ ===
-    const API_URL = "https://script.google.com/macros/s/AKfycbwwJN6L67adYokPcZBTovg4algSbXO_LSxgujTJbMWdYqUspCFgLSEN-dDbXfuGpsr1/exec";
-    // === ФУНКЦИИ СИНХРОНИЗАЦИИ ===
-    async function loadRoomStatesFromServer() {
-      try {
-        const res = await fetch(API_URL + '?action=getRooms');
-        if (!res.ok) throw new Error("Network error: " + res.status);
-        const data = await res.json();
-        return data || {};
-      } catch (e) {
-        console.error("Failed to load room states:", e);
-        return {};
-      }
-    }
+  // === ГЛОБАЛЬНЫЕ НАСТРОЙКИ ===
+  const API_URL = "https://script.google.com/macros/s/AKfycbwwJN6L67adYokPcZBTovg4algSbXO_LSxgujTJbMWdYqUspCFgLSEN-dDbXfuGpsr1/exec";
 
-    async function saveRoomStatesToServer(states) {
-      try {
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'setRooms', rooms: states })
+  // === ФУНКЦИИ СИНХРОНИЗАЦИИ ===
+  async function loadRoomStatesFromServer() {
+    try {
+      const res = await fetch(API_URL + '?action=getRooms');
+      if (!res.ok) throw new Error("Network error: " + res.status);
+      const data = await res.json();
+      return data || {};
+    } catch (e) {
+      console.error("Failed to load room states:", e);
+      return {};
+    }
+  }
+
+  async function saveRoomStatesToServer(states) {
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setRooms', rooms: states })
+      });
+      if (!res.ok) throw new Error("Save failed: " + res.status);
+    } catch (e) {
+      console.error("Failed to save room states:", e);
+      alert("⚠️ Sync failed! Changes may not appear on other devices.");
+    }
+  }
+
+  // === ВКЛАДКИ ===
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    });
+  });
+
+  // === КАРТА НОМЕРОВ ===
+  const floors = [
+    { id: 'floor10', rooms: Array.from({length: 10}, (_, i) => 10 + i) },
+    { id: 'floor20', rooms: Array.from({length: 10}, (_, i) => 20 + i) },
+    { id: 'floor30', rooms: Array.from({length: 10}, (_, i) => 30 + i) },
+    { id: 'floor40', rooms: Array.from({length: 10}, (_, i) => 40 + i) },
+    { id: 'floor50', rooms: Array.from({length: 10}, (_, i) => 50 + i) },
+    { id: 'floor60', rooms: [60, 61] }
+  ];
+
+  async function createRooms() {
+    const states = await loadRoomStatesFromServer();
+    floors.forEach(floor => {
+      const container = document.getElementById(floor.id);
+      container.innerHTML = '';
+      floor.rooms.forEach(roomNum => {
+        const room = document.createElement('div');
+        room.className = 'room';
+        room.textContent = roomNum;
+        room.dataset.room = roomNum;
+        if (states[roomNum] === 'occupied') {
+          room.classList.add('occupied');
+        } else {
+          room.classList.add('free');
+        }
+        room.addEventListener('click', async () => {
+          room.classList.toggle('free');
+          room.classList.toggle('occupied');
+          const currentStates = await loadRoomStatesFromServer();
+          currentStates[roomNum] = room.classList.contains('occupied') ? 'occupied' : 'free';
+          await saveRoomStatesToServer(currentStates);
         });
-        if (!res.ok) throw new Error("Save failed: " + res.status);
-      } catch (e) {
-        console.error("Failed to save room states:", e);
-        alert("⚠️ Sync failed! Changes may not appear on other devices.");
-      }
-    }
-
-    // === ВКЛАДКИ ===
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tabId = btn.dataset.tab;
-        // Убрать активный класс
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        // Добавить активный
-        btn.classList.add('active');
-        document.getElementById(tabId).classList.add('active');
+        container.appendChild(room);
       });
     });
+  }
 
-    // === КАРТА НОМЕРОВ ===
-    const floors = [
-      { id: 'floor10', rooms: Array.from({length: 10}, (_, i) => 10 + i) },
-      { id: 'floor20', rooms: Array.from({length: 10}, (_, i) => 20 + i) },
-      { id: 'floor30', rooms: Array.from({length: 10}, (_, i) => 30 + i) },
-      { id: 'floor40', rooms: Array.from({length: 10}, (_, i) => 40 + i) },
-      { id: 'floor50', rooms: Array.from({length: 10}, (_, i) => 50 + i) },
-      { id: 'floor60', rooms: [60, 61] }
-    ];
+  // === РАСПРЕДЕЛЕНИЕ УБОРКИ ===
+  const ALL_ROOMS = [
+    10,11,12,13,14,15,16,17,18,19,
+    20,21,22,23,24,25,26,27,28,29,
+    30,31,32,33,34,35,36,37,38,39,
+    40,41,42,43,44,45,46,47,48,49,
+    50,51,52,53,54,55,56,57,58,59,
+    60,61
+  ];
 
-    async function createRooms() {
-      const states = await loadRoomStatesFromServer();
-      floors.forEach(floor => {
-        const container = document.getElementById(floor.id);
-        container.innerHTML = '';
-        floor.rooms.forEach(roomNum => {
-          const room = document.createElement('div');
-          room.className = 'room';
-          room.textContent = roomNum;
-          room.dataset.room = roomNum;
-          if (states[roomNum] === 'occupied') {
-            room.classList.add('occupied');
-          } else {
-            room.classList.add('free');
-          }
-          room.addEventListener('click', async () => {
-            room.classList.toggle('free');
-            room.classList.toggle('occupied');
-            // Получаем актуальное состояние перед сохранением
-            const currentStates = await loadRoomStatesFromServer();
-            currentStates[roomNum] = room.classList.contains('occupied') ? 'occupied' : 'free';
-            await saveRoomStatesToServer(currentStates);
-          });
-          container.appendChild(room);
-        });
-      });
-    }
+  let selectedRooms = new Set();
+  let currentWorkerName = '';
+  let currentTasks = [];
+  const today = new Date().toLocaleDateString('en-GB');
 
-    // === РАСПРЕДЕЛЕНИЕ УБОРКИ ===
-    const ALL_ROOMS = [
-      10,11,12,13,14,15,16,17,18,19,
-      20,21,22,23,24,25,26,27,28,29,
-      30,31,32,33,34,35,36,37,38,39,
-      40,41,42,43,44,45,46,47,48,49,
-      50,51,52,53,54,55,56,57,58,59,
-      60,61
-    ];
-
-    let selectedRooms = new Set();
-    let currentWorkerName = '';
-    let currentTasks = [];
-    const today = new Date().toLocaleDateString('en-GB');
-
-    function createRoomSelect(currentValue = '') {
-      const select = document.createElement('select');
-      select.className = 'room-select';
-      select.innerHTML = '<option value="">—</option>';
-      ALL_ROOMS.forEach(room => {
-        const opt = document.createElement('option');
-        opt.value = room;
-        opt.textContent = room;
-        if (selectedRooms.has(room) && String(room) !== currentValue) {
-          opt.disabled = true;
-        }
-        if (String(room) === currentValue) {
-          opt.selected = true;
-        }
-        select.appendChild(opt);
-      });
-      return select;
-    }
-
-    function updateRoomAvailability() {
-      selectedRooms.clear();
-      document.querySelectorAll('.room-select').forEach(sel => {
-        if (sel.value) selectedRooms.add(Number(sel.value));
-      });
-      document.querySelectorAll('.room-select').forEach(sel => {
-        const val = sel.value;
-        const newSel = createRoomSelect(val);
-        sel.replaceWith(newSel);
-        newSel.addEventListener('change', updateRoomAvailability);
-      });
-    }
-
-    function showInitialScreen() {
-      const container = document.getElementById('mainContainer');
-      container.innerHTML = `
-        <h2>Worker Assignment</h2>
-        <div class="date-display">Date: ${today}</div>
-        <input type="text" id="workerName" placeholder="Enter worker name" maxlength="30">
-        <h3>Assign Rooms</h3>
-        <table id="assignmentTable">
-          <thead><tr><th>Room</th><th>Checkout</th><th>Garim</th></tr></thead>
-          <tbody id="tableBody"></tbody>
-        </table>
-        <button id="startBtn">Start</button>
-      `;
-
-      const tbody = document.getElementById('tableBody');
-      for (let i = 0; i < 30; i++) {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td></td>
-          <td><input type="checkbox" class="checkout"></td>
-          <td><input type="checkbox" class="garim"></td>
-        `;
-        const select = createRoomSelect();
-        row.cells[0].appendChild(select);
-        tbody.appendChild(row);
-
-        const co = row.querySelector('.checkout');
-        const ga = row.querySelector('.garim');
-        co.addEventListener('change', () => { if (co.checked) ga.checked = false; });
-        ga.addEventListener('change', () => { if (ga.checked) co.checked = false; });
-        select.addEventListener('change', updateRoomAvailability);
+  function createRoomSelect(currentValue = '') {
+    const select = document.createElement('select');
+    select.className = 'room-select';
+    select.innerHTML = '<option value="">—</option>';
+    ALL_ROOMS.forEach(room => {
+      const opt = document.createElement('option');
+      opt.value = room;
+      opt.textContent = room;
+      if (selectedRooms.has(room) && String(room) !== currentValue) {
+        opt.disabled = true;
       }
-
-      document.getElementById('startBtn').addEventListener('click', validateAndStart);
-    }
-
-    function showResultScreen(filledRows) {
-      currentTasks = filledRows;
-      const container = document.getElementById('mainContainer');
-      let rowsHtml = '';
-      filledRows.forEach(item => {
-        rowsHtml += `
-          <tr>
-            <td>${item.room}</td>
-            <td>${item.checkout ? '✅' : ''}</td>
-            <td>${item.garim ? '✅' : ''}</td>
-            <td><input type="checkbox" class="done-check"></td>
-          </tr>
-        `;
-      });
-
-      container.innerHTML = `
-        <h2>Active Tasks for: ${currentWorkerName}</h2>
-        <div class="date-display">Date: ${today}</div>
-        <table>
-          <thead><tr><th>Room</th><th>Checkout</th><th>Garim</th><th>Done</th></tr></thead>
-          <tbody id="resultBody">${rowsHtml}</tbody>
-        </table>
-        <button id="finishBtn" style="display:none;">Finish Work</button>
-      `;
-
-      function checkFinish() {
-        const allDone = Array.from(document.querySelectorAll('.done-check')).every(cb => cb.checked);
-        document.getElementById('finishBtn').style.display = allDone ? 'block' : 'none';
+      if (String(room) === currentValue) {
+        opt.selected = true;
       }
+      select.appendChild(opt);
+    });
+    return select;
+  }
 
-      document.getElementById('resultBody').addEventListener('change', (e) => {
-        if (e.target.classList.contains('done-check')) checkFinish();
-      });
+  function updateRoomAvailability() {
+    selectedRooms.clear();
+    document.querySelectorAll('.room-select').forEach(sel => {
+      if (sel.value) selectedRooms.add(Number(sel.value));
+    });
+    document.querySelectorAll('.room-select').forEach(sel => {
+      const val = sel.value;
+      const newSel = createRoomSelect(val);
+      sel.replaceWith(newSel);
+      newSel.addEventListener('change', updateRoomAvailability);
+    });
+  }
 
-      document.getElementById('finishBtn').addEventListener('click', () => {
-        document.getElementById('pdfModal').style.display = 'block';
-      });
+  function showInitialScreen() {
+    const container = document.getElementById('mainContainer');
+    container.innerHTML = `
+      <h2>Worker Assignment</h2>
+      <div class="date-display">Date: ${today}</div>
+      <input type="text" id="workerName" placeholder="Enter worker name" maxlength="30">
+      <h3>Assign Rooms</h3>
+      <table id="assignmentTable">
+        <thead><tr><th>Room</th><th>Checkout</th><th>Garim</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <button id="startBtn">Start</button>
+    `;
 
-      checkFinish();
+    const tbody = document.getElementById('tableBody');
+    for (let i = 0; i < 30; i++) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td></td>
+        <td><input type="checkbox" class="checkout"></td>
+        <td><input type="checkbox" class="garim"></td>
+      `;
+      const select = createRoomSelect();
+      row.cells[0].appendChild(select);
+      tbody.appendChild(row);
+
+      const co = row.querySelector('.checkout');
+      const ga = row.querySelector('.garim');
+      co.addEventListener('change', () => { if (co.checked) ga.checked = false; });
+      ga.addEventListener('change', () => { if (ga.checked) co.checked = false; });
+      select.addEventListener('change', updateRoomAvailability);
     }
 
-    function generateAndDownloadPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      let y = 20;
-      doc.setFontSize(18);
-      doc.text('Hotel Work Report', 14, y);
-      y += 12;
-      doc.setFontSize(12);
-      doc.text(`Worker: ${currentWorkerName}`, 14, y);
-      y += 8;
-      doc.text(`Date: ${today}`, 14, y);
-      y += 12;
-      doc.text('Completed Tasks (Status: Completed)', 14, y);
-      y += 8;
-      currentTasks.forEach(task => {
-        const action = task.checkout ? 'Checkout' : 'Garim';
-        const line = `Room ${task.room} — Task: ${action}`;
-        doc.text(line, 14, y);
-        y += 7;
-        if (y > 280) {
-          doc.addPage();
-          y = 20;
-        }
-      });
-      const filename = `hotel-report-${currentWorkerName.replace(/\s+/g, '-')}-${today.replace(/\//g, '-')}.pdf`;
-      doc.save(filename);
+    document.getElementById('startBtn').addEventListener('click', validateAndStart);
+  }
+
+  function showResultScreen(filledRows) {
+    currentTasks = filledRows;
+    const container = document.getElementById('mainContainer');
+    let rowsHtml = '';
+    filledRows.forEach(item => {
+      rowsHtml += `
+        <tr>
+          <td>${item.room}</td>
+          <td>${item.checkout ? '✅' : ''}</td>
+          <td>${item.garim ? '✅' : ''}</td>
+          <td><input type="checkbox" class="done-check"></td>
+        </tr>
+      `;
+    });
+
+    container.innerHTML = `
+      <h2>Active Tasks for: ${currentWorkerName}</h2>
+      <div class="date-display">Date: ${today}</div>
+      <table>
+        <thead><tr><th>Room</th><th>Checkout</th><th>Garim</th><th>Done</th></tr></thead>
+        <tbody id="resultBody">${rowsHtml}</tbody>
+      </table>
+      <button id="finishBtn" style="display:none;">Finish Work</button>
+    `;
+
+    function checkFinish() {
+      const allDone = Array.from(document.querySelectorAll('.done-check')).every(cb => cb.checked);
+      document.getElementById('finishBtn').style.display = allDone ? 'block' : 'none';
+    }
+
+    document.getElementById('resultBody').addEventListener('change', (e) => {
+      if (e.target.classList.contains('done-check')) checkFinish();
+    });
+
+    document.getElementById('finishBtn').addEventListener('click', () => {
+      document.getElementById('pdfModal').style.display = 'block';
+    });
+
+    checkFinish();
+  }
+
+  function generateAndDownloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    let y = 20;
+    doc.setFontSize(18);
+    doc.text('Hotel Work Report', 14, y);
+    y += 12;
+    doc.setFontSize(12);
+    doc.text(`Worker: ${currentWorkerName}`, 14, y);
+    y += 8;
+    doc.text(`Date: ${today}`, 14, y);
+    y += 12;
+    doc.text('Completed Tasks (Status: Completed)', 14, y);
+    y += 8;
+    currentTasks.forEach(task => {
+      const action = task.checkout ? 'Checkout' : 'Garim';
+      const line = `Room ${task.room} — Task: ${action}`;
+      doc.text(line, 14, y);
+      y += 7;
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+    const filename = `hotel-report-${currentWorkerName.replace(/\s+/g, '-')}-${today.replace(/\//g, '-')}.pdf`;
+    doc.save(filename);
+    showInitialScreen();
+  }
+
+  function validateAndStart() {
+    const name = document.getElementById('workerName').value.trim();
+    if (!name) { alert('Please enter worker name!'); return; }
+    const filledRows = [];
+    document.querySelectorAll('#tableBody tr').forEach(row => {
+      const room = row.querySelector('.room-select').value;
+      const co = row.querySelector('.checkout').checked;
+      const ga = row.querySelector('.garim').checked;
+      if (room && (co || ga)) filledRows.push({ room, checkout: co, garim: ga });
+    });
+    if (filledRows.length === 0) { alert('Please assign at least one room with a task!'); return; }
+    currentWorkerName = name;
+    showResultScreen(filledRows);
+  }
+
+  // === ОБРАБОТЧИКИ МОДАЛЬНОГО ОКНА ===
+  document.getElementById('pdfYes').addEventListener('click', () => {
+    document.getElementById('pdfModal').style.display = 'none';
+    generateAndDownloadPDF();
+  });
+  document.getElementById('pdfNo').addEventListener('click', () => {
+    document.getElementById('pdfModal').style.display = 'none';
+    showInitialScreen();
+  });
+
+  // === ИНИЦИАЛИЗАЦИЯ ===
+  (async () => {
+    await createRooms();
+    if (typeof window.jspdf === 'undefined') {
+      document.getElementById('mainContainer').innerHTML = `<h2>Error</h2><p>PDF library not loaded. Check internet.</p>`;
+    } else {
       showInitialScreen();
     }
-
-    function validateAndStart() {
-      const name = document.getElementById('workerName').value.trim();
-      if (!name) { alert('Please enter worker name!'); return; }
-      const filledRows = [];
-      document.querySelectorAll('#tableBody tr').forEach(row => {
-        const room = row.querySelector('.room-select').value;
-        const co = row.querySelector('.checkout').checked;
-        const ga = row.querySelector('.garim').checked;
-        if (room && (co || ga)) filledRows.push({ room, checkout: co, garim: ga });
-      });
-      if (filledRows.length === 0) { alert('Please assign at least one room with a task!'); return; }
-      currentWorkerName = name;
-      showResultScreen(filledRows);
-    }
-
-    // === ОБРАБОТЧИКИ МОДАЛЬНОГО ОКНА ===
-    document.getElementById('pdfYes').addEventListener('click', () => {
-      document.getElementById('pdfModal').style.display = 'none';
-      generateAndDownloadPDF();
-    });
-    document.getElementById('pdfNo').addEventListener('click', () => {
-      document.getElementById('pdfModal').style.display = 'none';
-      showInitialScreen();
-    });
-
-    // === ИНИЦИАЛИЗАЦИЯ ===
-    (async () => {
-      await createRooms();
-      if (typeof window.jspdf === 'undefined') {
-        document.getElementById('mainContainer').innerHTML = `<h2>Error</h2><p>PDF library not loaded. Check internet.</p>`;
-      } else {
-        showInitialScreen();
-      }
-    })();
-  </script>
+  })();
+</script>
 </body>
 </html>
