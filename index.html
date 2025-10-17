@@ -207,10 +207,40 @@
   </div>
 
   <script>
+    // === ГЛОБАЛЬНЫЕ НАСТРОЙКИ ===
+    const API_URL = "https://script.google.com/macros/s/AKfycbyQc96tYj_YihE2kU8xBH3Zf2SePMeAqQ05lU9L4zaW2kVgN5doA4qzh7qzYsib3uhC_g/exec";
+
+    // === ФУНКЦИИ СИНХРОНИЗАЦИИ ===
+    async function loadRoomStatesFromServer() {
+      try {
+        const res = await fetch(API_URL + '?action=getRooms');
+        if (!res.ok) throw new Error("Network error: " + res.status);
+        const data = await res.json();
+        return data || {};
+      } catch (e) {
+        console.error("Failed to load room states:", e);
+        return {};
+      }
+    }
+
+    async function saveRoomStatesToServer(states) {
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'setRooms', rooms: states })
+        });
+        if (!res.ok) throw new Error("Save failed: " + res.status);
+      } catch (e) {
+        console.error("Failed to save room states:", e);
+        alert("⚠️ Sync failed! Changes may not appear on other devices.");
+      }
+    }
+
     // === ВКЛАДКИ ===
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const API_URL = "https://script.google.com/macros/s/AKfycbx3SWAo81mMCJKhzabItaNQaopW9cwvVlxRuXsWRFaXdbUbIdIC_v6q0j7dDSPhfrCJ/exec";
+        const tabId = btn.dataset.tab;
         // Убрать активный класс
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -230,17 +260,8 @@
       { id: 'floor60', rooms: [60, 61] }
     ];
 
-    function loadRoomStates() {
-      const saved = localStorage.getItem('hotelRoomStates');
-      return saved ? JSON.parse(saved) : {};
-    }
-
-    function saveRoomStates(states) {
-      localStorage.setItem('hotelRoomStates', JSON.stringify(states));
-    }
-
-    function createRooms() {
-      const states = loadRoomStates();
+    async function createRooms() {
+      const states = await loadRoomStatesFromServer();
       floors.forEach(floor => {
         const container = document.getElementById(floor.id);
         container.innerHTML = '';
@@ -254,12 +275,13 @@
           } else {
             room.classList.add('free');
           }
-          room.addEventListener('click', () => {
+          room.addEventListener('click', async () => {
             room.classList.toggle('free');
             room.classList.toggle('occupied');
-            const newStates = loadRoomStates();
-            newStates[roomNum] = room.classList.contains('occupied') ? 'occupied' : 'free';
-            saveRoomStates(newStates);
+            // Получаем актуальное состояние перед сохранением
+            const currentStates = await loadRoomStatesFromServer();
+            currentStates[roomNum] = room.classList.contains('occupied') ? 'occupied' : 'free';
+            await saveRoomStatesToServer(currentStates);
           });
           container.appendChild(room);
         });
@@ -434,15 +456,7 @@
       showResultScreen(filledRows);
     }
 
-    // Инициализация
-    createRooms();
-    if (typeof window.jspdf === 'undefined') {
-      document.getElementById('mainContainer').innerHTML = `<h2>Error</h2><p>PDF library not loaded. Check internet.</p>`;
-    } else {
-      showInitialScreen();
-    }
-
-    // Обработчики модального окна
+    // === ОБРАБОТЧИКИ МОДАЛЬНОГО ОКНА ===
     document.getElementById('pdfYes').addEventListener('click', () => {
       document.getElementById('pdfModal').style.display = 'none';
       generateAndDownloadPDF();
@@ -451,6 +465,16 @@
       document.getElementById('pdfModal').style.display = 'none';
       showInitialScreen();
     });
+
+    // === ИНИЦИАЛИЗАЦИЯ ===
+    (async () => {
+      await createRooms();
+      if (typeof window.jspdf === 'undefined') {
+        document.getElementById('mainContainer').innerHTML = `<h2>Error</h2><p>PDF library not loaded. Check internet.</p>`;
+      } else {
+        showInitialScreen();
+      }
+    })();
   </script>
 </body>
 </html>
